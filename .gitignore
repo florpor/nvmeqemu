@@ -70,3 +70,8 @@ TAGS
 *~
 linux-headers/asm
 .project
+.cproject
+CentOS-6.5-x86_64-bin-DVD1.iso
+centos_virtual_hd.img
+nvme_disk0_n1.img
+run_nvme

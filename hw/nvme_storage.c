@@ -38,11 +38,13 @@ static void dsm_dealloc(DiskInfo *disk, uint64_t slba, uint64_t nlb);
 
 void nvme_dma_mem_read(target_phys_addr_t addr, uint8_t *buf, int len)
 {
+//	printf("buf read 0x%016lX\n", (uint64_t)buf);
     cpu_physical_memory_rw(addr, buf, len, 0);
 }
 
 void nvme_dma_mem_write(target_phys_addr_t addr, uint8_t *buf, int len)
 {
+//	printf("buf write 0x%016lX\n", (uint64_t)buf);
     cpu_physical_memory_rw(addr, buf, len, 1);
 }
 
@@ -62,8 +64,8 @@ static uint8_t do_rw_prp(NVMEState *n, uint64_t mem_addr, uint64_t *data_size_p,
     }
 
     LOG_DBG("File offset for read/write:%ld", *file_offset_p);
-    LOG_DBG("Length for read/write:%ld", data_len);
-    LOG_DBG("Address for read/write:%ld", mem_addr);
+    LOG_DBG("Length for read/write:%ld (0x%016lX)", data_len, data_len);
+    LOG_DBG("Address for read/write:%ld (0x%016lX))", mem_addr, mem_addr);
 
     switch (rw) {
     case NVME_CMD_READ:
@@ -78,6 +80,43 @@ static uint8_t do_rw_prp(NVMEState *n, uint64_t mem_addr, uint64_t *data_size_p,
         LOG_ERR("Error- wrong opcode: %d", rw);
         return FAIL;
     }
+    { // DEBUG CODE DUMP
+    	unsigned int* start_p = (unsigned int*)(mapping_addr + *file_offset_p);
+    	unsigned int* end_p = (unsigned int*)(mapping_addr + *file_offset_p) + data_len / sizeof(unsigned int);
+    	int i =0,iall = 0;
+    	char msgBuf[512];
+    	char* msg = (char*)msgBuf;
+    	int gotSomething = 0;
+    	printf("---------------------------------------\nDUMP MEMORY START\n0x%016lX - 0x%016lX\n---------------------------------------\n",(uint64_t)start_p,(uint64_t)end_p);
+
+    	while (start_p < end_p){
+    		char* asCharArray = (char*)start_p;
+    		if (*start_p != 0){
+    			gotSomething = 1;
+    		}
+
+    		if (i == 0){
+    			msg += sprintf(msg, "#%d: 0x%016lX | ", iall, (uint64_t)start_p);
+    		}
+    		msg += sprintf(msg, "0x%X %c%c%c%c | ", *start_p, asCharArray[0], asCharArray[1], asCharArray[2], asCharArray[3]);
+    		if (i == 3) {
+    			if (gotSomething){
+    				printf("%s\n",msgBuf);
+    			}
+    			i = 0;
+    			gotSomething = 0;
+    			msg = (char*)msgBuf;
+    		}else{
+    			msg += sprintf(msg, " ");
+    			i++;
+    		}
+    		start_p++;
+    		iall++;
+
+    	}
+    	printf("---------------------------------------\nDUMP MEMORY END\n---------------------------------------\n");
+    }
+
     *file_offset_p = *file_offset_p + data_len;
     *data_size_p = *data_size_p - data_len;
     return NVME_SC_SUCCESS;
@@ -271,6 +310,7 @@ uint8_t nvme_io_command(NVMEState *n, NVMECmd *sqe, NVMECQE *cqe)
     }
 
     /* Writing/Reading PRP1 */
+    LOG_DBG("Writing/Reading PRP1");
     res = do_rw_prp(n, e->prp1, &data_size, &file_offset, mapping_addr,
         e->opcode);
     if (res == FAIL) {
@@ -278,9 +318,11 @@ uint8_t nvme_io_command(NVMEState *n, NVMECmd *sqe, NVMECQE *cqe)
     }
     if (data_size > 0) {
         if (data_size <= PAGE_SIZE) {
+        	LOG_DBG("Writing/Reading PRP2");
             res = do_rw_prp(n, e->prp2, &data_size, &file_offset, mapping_addr,
                 e->opcode);
         } else {
+        	LOG_DBG("Writing/Reading do_rw_prp_list!");
             res = do_rw_prp_list(n, sqe, &data_size, &file_offset,
                 mapping_addr);
         }

@@ -215,7 +215,10 @@ static void sq_processing_timer_cb(void *param)
 
     /* Check SQs for work */
     for (sq_id = 0; sq_id < NVME_MAX_QS_ALLOCATED; sq_id++) {
+    	int iii=0;
         while (n->sq[sq_id].head != n->sq[sq_id].tail) {
+        	LOG_DBG("sq_id %d in #%d , head,tail (:%d , %d)", sq_id, iii++, n->sq[sq_id].head, n->sq[sq_id].tail);
+
             /* Handle one SQ entry */
             if (process_sq(n, sq_id)) {
                 break;
