@@ -33,6 +33,14 @@
 
 #include <hw/ide/internal.h>
 
+
+#include "../common.h"
+
+#define TARGET_I386_VSSIM
+#ifdef TARGET_I386_VSSIM
+	#include "../ssd.h"  //Include SSD Features
+#endif
+
 /* These values were based on a Seagate ST3500418AS but have been modified
    to make more sense in QEMU */
 static const int smart_attributes[][12] = {
@@ -96,6 +104,13 @@ static void ide_identify(IDEState *s)
     padstr((char *)(p + 10), s->drive_serial_str, 20); /* serial number */
     put_le16(p + 20, 3); /* XXX: retired, remove ? */
     put_le16(p + 21, 512); /* cache size in sectors */
+
+
+    //modified by createmain for SSD Trim function
+    put_le16(p + 21, 0x0400); //support for the DSM is changeable.
+
+
+
     put_le16(p + 22, 4); /* ecc bytes */
     padstr((char *)(p + 23), s->version, 8); /* firmware version */
     padstr((char *)(p + 27), "QEMU HARDDISK", 40); /* model */
@@ -163,6 +178,10 @@ static void ide_identify(IDEState *s)
     if (dev && dev->conf.discard_granularity) {
         put_le16(p + 169, 1); /* TRIM support */
     }
+
+#ifdef TARGET_I386_VSSIM
+    put_le16(p + 217, 0x01); //rotation speed is 1, it means SSD
+#endif
 
     memcpy(s->identify_data, p, sizeof(s->identify_data));
     s->identify_set = 1;
@@ -473,6 +492,10 @@ void ide_sector_read(IDEState *s)
         if (n > s->req_nb_sectors)
             n = s->req_nb_sectors;
         ret = bdrv_read(s->bs, sector_num, s->io_buffer, n);
+#ifdef TARGET_I386_VSSIM
+	if(strcmp(s->bs->filename, GET_FILE_NAME())==0)
+		SSD_READ(n,sector_num); //SSD READ function call
+#endif
         if (ret != 0) {
             if (ide_handle_rw_error(s, -ret,
                 BM_STATUS_PIO_RETRY | BM_STATUS_RETRY_READ))
@@ -591,10 +614,22 @@ handle_rw_error:
     case IDE_DMA_READ:
         s->bus->dma->aiocb = dma_bdrv_read(s->bs, &s->sg, sector_num,
                                            ide_dma_cb, s);
+#ifdef TARGET_I386_VSSIM
+		if(strcmp(s->bs->filename, GET_FILE_NAME())==0)
+			SSD_READ(n, sector_num);
+#endif
         break;
     case IDE_DMA_WRITE:
         s->bus->dma->aiocb = dma_bdrv_write(s->bs, &s->sg, sector_num,
                                             ide_dma_cb, s);
+
+#ifdef TARGET_I386_VSSIM
+		if(strcmp(s->bs->filename, GET_FILE_NAME())==0)
+		{
+			SSD_WRITE(n, sector_num);
+		}
+#endif
+
         break;
     case IDE_DMA_TRIM:
         s->bus->dma->aiocb = dma_bdrv_io(s->bs, &s->sg, sector_num,
@@ -646,6 +681,13 @@ void ide_sector_write(IDEState *s)
         if (ide_handle_rw_error(s, -ret, BM_STATUS_PIO_RETRY))
             return;
     }
+
+#ifdef TARGET_I386_VSSIM
+	if(strcmp(s->bs->filename, GET_FILE_NAME())==0)
+	{
+		SSD_WRITE(n, sector_num);
+	}
+#endif
 
     s->nsector -= n;
     if (s->nsector == 0) {
@@ -980,6 +1022,12 @@ void ide_exec_cmd(IDEBus *bus, uint32_t val)
         ide_transfer_start(s, s->io_buffer, 512, ide_sector_write);
         s->media_changed = 1;
         break;
+
+        /* modified by createmain for TRIM */
+case DSM_TRIM:
+    ide_set_irq(s->bus);
+    break;
+
 	case WIN_MULTREAD_EXT:
 	lba48 = 1;
     case WIN_MULTREAD:
@@ -1814,6 +1862,10 @@ void ide_init2(IDEBus *bus, qemu_irq irq)
     }
     bus->irq = irq;
     bus->dma = &ide_dma_nop;
+
+#ifdef TARGET_I386_VSSIM
+    SSD_INIT();
+#endif
 }
 
 /* TODO convert users to qdev and remove */

@@ -124,6 +124,7 @@ int main(int argc, char **argv)
 #include "hw/xen.h"
 #include "hw/qdev.h"
 #include "hw/loader.h"
+#include "hw/ssd.h"
 #include "bt-host.h"
 #include "net.h"
 #include "net/slirp.h"
@@ -3318,6 +3319,11 @@ int main(int argc, char **argv, char **envp)
     main_loop();
     quit_timers();
     net_cleanup();
+
+#define TARGET_I386_VSSIM
+#ifdef TARGET_I386_VSSIM
+    SSD_TERM();
+#endif
 
     return 0;
 }

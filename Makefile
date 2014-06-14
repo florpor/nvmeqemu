@@ -19,6 +19,8 @@ config-host.mak:
 	@exit 1
 endif
 
+QEMU_CFLAGS += -g
+
 # Don't try to regenerate Makefile or configure
 # We don't generate any of them
 Makefile: ;

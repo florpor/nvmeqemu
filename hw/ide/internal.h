@@ -15,6 +15,7 @@
 //#define DEBUG_IDE
 //#define DEBUG_IDE_ATAPI
 //#define DEBUG_AIO
+#define DEBUG_DSM
 #define USE_DMA_CDROM
 
 typedef struct IDEBus IDEBus;
@@ -188,6 +189,10 @@ typedef struct IDEDMAOps IDEDMAOps;
 #define WIN_READ_NATIVE_MAX		0xF8 /* return the native maximum address */
 #define WIN_SET_MAX			0xF9
 #define DISABLE_SEAGATE			0xFB
+
+/*Data Set Management, TRIM Command*/
+//#define DSM_TRIM			0x06
+
 
 /* set to 1 set disable mult support */
 #define MAX_MULT_SECTORS 16
