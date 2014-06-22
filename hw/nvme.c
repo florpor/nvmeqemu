@@ -88,8 +88,8 @@ static void process_doorbell(NVMEState *nvme_dev, target_phys_addr_t addr,
     uint32_t queue_id;
     int64_t deadline;
 
-    LOG_DBG("%s(): addr = 0x%08x, val = 0x%08x",
-        __func__, (unsigned)addr, val);
+    //LOG_DBG("%s(): addr = 0x%08x, val = 0x%08x",
+    //    __func__, (unsigned)addr, val);
 
 
     /* Check if it is CQ or SQ doorbell */
@@ -125,7 +125,7 @@ static void process_doorbell(NVMEState *nvme_dev, target_phys_addr_t addr,
         if (nvme_dev->cq[queue_id].irq_enabled &&
             !(nvme_irqcq_empty(nvme_dev, nvme_dev->cq[queue_id].vector))) {
             /* reset the P bit */
-            LOG_DBG("Reset P bit for vec:%d", nvme_dev->cq[queue_id].vector);
+            //LOG_DBG("Reset P bit for vec:%d", nvme_dev->cq[queue_id].vector);
             msix_clr_pending(&nvme_dev->dev, nvme_dev->cq[queue_id].vector);
 
         }
@@ -294,8 +294,8 @@ static void nvme_mmio_writel(void *opaque, target_phys_addr_t addr,
     NVMEState *nvme_dev = (NVMEState *) opaque;
     uint32_t var; /* Variable to store reg values locally */
 
-    LOG_DBG("%s(): addr = 0x%08x, val = 0x%08x",
-        __func__, (unsigned)addr, val);
+    //LOG_DBG("%s(): addr = 0x%08x, val = 0x%08x",
+    //    __func__, (unsigned)addr, val);
     /* Check if NVME controller Capabilities was written */
     if (addr < NVME_SQ0TDBL) {
         switch (addr) {

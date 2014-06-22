@@ -35,8 +35,8 @@ uint8_t is_cq_full(NVMEState *n, uint16_t qid)
 static void incr_sq_head(NVMEIOSQueue *q)
 {
     q->head = (q->head + 1) % q->size;
-    LOG_DBG("%s(): (SQID, HD, SZ) = (%d, %d, %d)", __func__,
-        q->id, q->head, q->size);
+    //LOG_DBG("%s(): (SQID, HD, SZ) = (%d, %d, %d)", __func__,
+    //    q->id, q->head, q->size);
 }
 
 void incr_cq_tail(NVMEIOCQueue *q)
@@ -57,7 +57,7 @@ static uint64_t find_discontig_queue_entry(uint32_t pg_size, uint16_t queue_ptr,
     uint32_t pg_no, prp_pg_no, entr_per_pg, prps_per_pg, prp_entry, pg_entry;
     uint64_t dma_addr, entry_addr;
 
-    LOG_DBG("%s(): called", __func__);
+    //LOG_DBG("%s(): called", __func__);
     /* All PRP entries start with offset 00h */
     entr_per_pg = (uint32_t) (pg_size / cmd_size);
     /* pg_no and prp_pg_no start with 0 */
@@ -118,12 +118,12 @@ int process_sq(NVMEState *n, uint16_t sq_id)
     }
     cq_id = n->sq[sq_id].cq_id;
     if (is_cq_full(n, cq_id)) {
-        LOG_DBG("CQ %d is full", cq_id);
+        //LOG_DBG("CQ %d is full", cq_id);
         return -1;
     }
     memset(&cqe, 0, sizeof(cqe));
 
-    LOG_DBG("%s(): called, sq_id %d", __func__, sq_id);
+    //LOG_DBG("%s(): called, sq_id %d", __func__, sq_id);
 
     /* Process SQE */
     if (sq_id == ASQ_ID || n->sq[sq_id].phys_contig) {

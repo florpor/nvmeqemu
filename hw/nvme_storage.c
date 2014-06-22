@@ -116,7 +116,7 @@ static uint8_t do_rw_prp(NVMEState *n, uint64_t mem_addr, uint64_t *data_size_p,
     	}
     	printf("---------------------------------------\nDUMP MEMORY END\n---------------------------------------\n");
     }
-
+   
     *file_offset_p = *file_offset_p + data_len;
     *data_size_p = *data_size_p - data_len;
     return NVME_SC_SUCCESS;
@@ -259,6 +259,7 @@ uint8_t nvme_io_command(NVMEState *n, NVMECmd *sqe, NVMECQE *cqe)
     uint8_t lba_idx;
 
     sf->sc = NVME_SC_SUCCESS;
+    LOG_TIME();
     LOG_DBG("%s(): called", __func__);
 
     disk = &n->disk[e->nsid - 1];
