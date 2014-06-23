@@ -146,9 +146,9 @@ int process_sq(NVMEState *n, uint16_t sq_id)
         }
     } else {
        /* TODO add support for IO commands with different sizes of Q elements */
-    	LOG_DBG("%s(): called, sq_id %d before nvme_command_set", __func__, sq_id);
+       //LOG_DBG("%s(): called, sq_id %d before nvme_command_set", __func__, sq_id);
        nvme_command_set(n, &sqe, &cqe);
-       LOG_DBG("%s(): called, sq_id %d after nvme_command_set", __func__, sq_id);
+       //LOG_DBG("%s(): called, sq_id %d after nvme_command_set", __func__, sq_id);
     }
 
     /* Filling up the CQ entry */
