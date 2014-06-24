@@ -39,6 +39,7 @@
 #include <linux/ptrace.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/time.h>
 #include <linux/types.h>
 #include <linux/version.h>
 #include <linux/highmem.h>
@@ -49,6 +50,7 @@
 #define CQ_SIZE(depth)		(depth * sizeof(struct nvme_completion))
 #define NVME_MINORS 64
 #define ADMIN_TIMEOUT	(60 * HZ)
+#define LOG_NVME(fmt, ...) printk(KERN_DEBUG "DBG|%s:" fmt, __func__, ## __VA_ARGS__)
 
 static int nvme_major;
 module_param(nvme_major, int, 0);
@@ -86,6 +88,17 @@ struct nvme_queue {
 	u8 q_suspended;
 	unsigned long cmdid_data[];
 };
+
+/*
+ * This is only for debugging and analysing. Do not use this normally...
+*/
+static inline void _nvme_get_epoch_string(char* time_string)
+{
+	struct timespec ts;
+
+	getnstimeofday(&ts);
+	snprintf(time_string, 21, "%lld.%09lld", (long long)ts.tv_sec, (long long)ts.tv_nsec);
+}
 
 /*
  * Check we didin't inadvertently grow the command struct
@@ -254,6 +267,14 @@ static int nvme_submit_cmd(struct nvme_queue *nvmeq, struct nvme_command *cmd)
 {
 	unsigned long flags;
 	u16 tail;
+	/*char* time_string;*/
+
+	/* this might be useful to log late */
+	/*time_string = kmalloc(sizeof(char) * 21, GFP_KERNEL);
+	_nvme_get_epoch_string(time_string);
+	LOG_NVME("%s:nvme_submit_cmd", time_string);
+	kfree(time_string);*/
+
 	spin_lock_irqsave(&nvmeq->q_lock, flags);
 	tail = nvmeq->sq_tail;
 	memcpy(&nvmeq->sq_cmds[tail], cmd, sizeof(*cmd));
@@ -345,6 +366,7 @@ static void nvme_end_io_acct(struct bio *bio, unsigned long start_time)
 static void bio_completion(struct nvme_dev *dev, void *ctx,
 						struct nvme_completion *cqe)
 {
+	char* time_string;
 	struct nvme_iod *iod = ctx;
 	struct bio *bio = iod->private;
 	u16 status = le16_to_cpup(&cqe->status) >> 1;
@@ -353,6 +375,23 @@ static void bio_completion(struct nvme_dev *dev, void *ctx,
 		dma_unmap_sg(&dev->pci_dev->dev, iod->sg, iod->nents,
 			bio_data_dir(bio) ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
 		nvme_end_io_acct(bio, iod->start_time);
+
+		time_string = kmalloc(sizeof(char) * 21, GFP_KERNEL);
+		_nvme_get_epoch_string(time_string);
+
+		/* finished writing / reading */
+		if (bio_data_dir(bio))
+		{
+			LOG_NVME("%s:Completed write: npages %d, offset %d, address 0x%llx", time_string, iod->npages, iod->offset, iod->first_dma);
+		}
+		else
+		{
+			LOG_NVME("%s:Completed read: npages %d, offset %d, address 0x%llx", time_string, iod->npages, iod->offset, iod->first_dma);
+			/* read actual data */
+			LOG_NVME("%s:Read data: %s", time_string, (char *)bio_data(bio));
+		}
+
+		kfree(time_string);
 	}
 	nvme_free_iod(dev, iod);
 	if (status)
@@ -637,6 +676,8 @@ static int nvme_submit_flush(struct nvme_queue *nvmeq, struct nvme_ns *ns,
 	cmnd->common.command_id = cmdid;
 	cmnd->common.nsid = cpu_to_le32(ns->ns_id);
 
+	LOG_NVME("Submitting flush to NVMe device");
+
 	if (++nvmeq->sq_tail == nvmeq->q_depth)
 		nvmeq->sq_tail = 0;
 	writel(nvmeq->sq_tail, nvmeq->q_db);
@@ -666,6 +707,7 @@ static int nvme_submit_bio_queue(struct nvme_queue *nvmeq, struct nvme_ns *ns,
 	int cmdid, length, result;
 	u16 control;
 	u32 dsmgmt;
+	char* time_string;
 	int psegs = bio_phys_segments(ns->queue, bio);
 
 	if ((bio->bi_rw & REQ_FLUSH) && psegs) {
@@ -729,6 +771,23 @@ static int nvme_submit_bio_queue(struct nvme_queue *nvmeq, struct nvme_ns *ns,
 	cmnd->rw.control = cpu_to_le16(control);
 	cmnd->rw.dsmgmt = cpu_to_le32(dsmgmt);
 
+	time_string = kmalloc(sizeof(char) * 21, GFP_KERNEL);
+
+	if (cmnd->rw.opcode == nvme_cmd_write)
+	{
+		_nvme_get_epoch_string(time_string);
+		LOG_NVME("%s:Queuing write: %d bytes, %d PRPs, npages %d, offset %d, address 0x%llx", time_string, length, psegs, iod->npages, iod->offset, iod->first_dma);
+		/* read actual data */
+		LOG_NVME("%s:Write data: %s", time_string, (char *)bio_data(bio));
+	}
+	else if (cmnd->rw.opcode == nvme_cmd_read)
+	{
+		_nvme_get_epoch_string(time_string);
+		LOG_NVME("%s:Queuing read: %d bytes, %d PRPs, npages %d, offset %d, address 0x%llx", time_string, length, psegs, iod->npages, iod->offset, iod->first_dma);
+	}
+
+	kfree(time_string);
+
 	nvme_start_io_acct(bio);
 	if (++nvmeq->sq_tail == nvmeq->q_depth)
 		nvmeq->sq_tail = 0;
@@ -789,12 +848,19 @@ static int nvme_make_request(struct request_queue *q, struct bio *bio)
 	struct nvme_ns *ns = q->queuedata;
 	struct nvme_queue *nvmeq = get_nvmeq(ns->dev);
 	int result = -EBUSY;
+	/*char* time_string;*/
 
 	if (!nvmeq) {
 		put_nvmeq(NULL);
 		bio_endio(bio, -EIO);
 		return 0;
 	}
+
+	/* this may be useful to log later */
+	/*time_string = kmalloc(sizeof(char) * 21, GFP_KERNEL);
+	_nvme_get_epoch_string(time_string);
+	LOG_NVME("%s:nvme_make_request", time_string);
+	kfree(time_string);*/
 
 	spin_lock_irq(&nvmeq->q_lock);
 	if (!nvmeq->q_suspended && bio_list_empty(&nvmeq->sq_cong))
@@ -863,6 +929,13 @@ int nvme_submit_sync_cmd(struct nvme_queue *nvmeq, struct nvme_command *cmd,
 {
 	int cmdid;
 	struct sync_cmd_info cmdinfo;
+	/*char* time_string;*/
+
+	/* this might be useful to log later */
+	/*time_string = kmalloc(sizeof(char) * 21, GFP_KERNEL);
+	_nvme_get_epoch_string(time_string);
+	LOG_NVME("%s:nvme_submit_sync_cmd", time_string);
+	kfree(time_string);*/
 
 	cmdinfo.task = current;
 	cmdinfo.status = -EINTR;
@@ -1400,6 +1473,9 @@ static int nvme_submit_io(struct nvme_ns *ns, struct nvme_user_io __user *uio)
 
 	if (IS_ERR(iod))
 		return PTR_ERR(iod);
+
+	if (io.opcode == nvme_cmd_compare)
+		LOG_NVME("Comparing on NVMe device");
 
 	memset(&c, 0, sizeof(c));
 	c.rw.opcode = io.opcode;
