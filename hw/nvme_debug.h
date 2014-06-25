@@ -12,15 +12,12 @@
         __LINE__, ## __VA_ARGS__)
 #ifdef DEBUG
 #define LOG_DBG(fmt, ...)    \
-    printf("DBG|:%s:%d: " fmt "\n", CHOP_FILE(__FILE__), \
-        __LINE__, ## __VA_ARGS__)
-#define LOG_TIME()                \
-    {                             \
-        time_t now;               \
-        time(&now);               \
-        printf("DBG|:%s",ctime(&now)); \
+    { \
+        struct timeval tv; \
+        gettimeofday(&tv, NULL); \
+        printf("%llu.%llu ", (long long unsigned)tv.tv_sec,(long long unsigned)tv.tv_usec); \
+        printf("DBG|:%s:%d: " fmt "\n", CHOP_FILE(__FILE__),__LINE__, ## __VA_ARGS__); \
     }
 #else
 #define LOG_DBG(fmt, ...)
-#define LOG_TIME()
 #endif
