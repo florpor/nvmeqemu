@@ -15,7 +15,7 @@
     { \
         struct timeval tv; \
         gettimeofday(&tv, NULL); \
-        printf("%llu.%09llu ", (long long unsigned)tv.tv_sec,(long long unsigned)tv.tv_usec); \
+        printf("%llu.%06llu ", (long long unsigned)tv.tv_sec,(long long unsigned)tv.tv_usec); \
         printf("DBG|:%s:%d: " fmt "\n", CHOP_FILE(__FILE__),__LINE__, ## __VA_ARGS__); \
     }
 #else
