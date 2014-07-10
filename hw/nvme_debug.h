@@ -13,9 +13,9 @@
 #ifdef DEBUG
 #define LOG_DBG(fmt, ...)    \
     { \
-        struct timeval tv; \
-        gettimeofday(&tv, NULL); \
-        printf("%llu.%06llu000 ", (long long unsigned)tv.tv_sec,(long long unsigned)tv.tv_usec); \
+        struct timespec ts; \
+        clock_gettime(CLOCK_REALTIME, &ts); \
+        printf("%lld.%09lld ", (long long)ts.tv_sec, (long long)ts.tv_nsec); \
         printf("DBG|:%s:%d: " fmt "\n", CHOP_FILE(__FILE__),__LINE__, ## __VA_ARGS__); \
     }
 #else
